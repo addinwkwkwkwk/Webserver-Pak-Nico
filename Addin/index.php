@@ -24,6 +24,10 @@ if (isset($_POST['daftar'])) {
     
     $berkas_nama = "";
     if (isset($_FILES['berkas']) && $_FILES['berkas']['error'] == 0) {
+        // Buat folder uploads jika belum ada
+        if (!is_dir('uploads')) {
+            mkdir('uploads', 0777, true);
+        }
         $berkas_nama = time() . '_' . $_FILES['berkas']['name'];
         move_uploaded_file($_FILES['berkas']['tmp_name'], 'uploads/' . $berkas_nama);
     }
@@ -47,7 +51,7 @@ $data_peserta = mysqli_query($koneksi, "SELECT * FROM peserta ORDER BY id DESC")
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f3f4f6; padding: 20px 10px; color: #1f2937; }
-        .container { max-width: 900px; margin: 0 auto; width: 100%; }
+        .container { max-width: 950px; margin: 0 auto; width: 100%; }
         .banner { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; border-radius: 12px; padding: 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 15px rgba(220, 38, 38, 0.25); margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
         .banner-left { display: flex; align-items: center; gap: 15px; }
         .banner-icon { width: 45px; height: 45px; fill: white; flex-shrink: 0; }
@@ -61,15 +65,24 @@ $data_peserta = mysqli_query($koneksi, "SELECT * FROM peserta ORDER BY id DESC")
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: #4b5563; margin-bottom: 6px; }
         .form-control { width: 100%; padding: 10px 12px; font-size: 14px; border: 1.5px solid #e5e7eb; border-radius: 8px; outline: none; transition: 0.2s; }
         .form-control:focus { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1); }
-        .file-box { border: 2px dashed #fca5a5; background: #fff5f5; border-radius: 8px; padding: 10px; text-align: center; }
+        .file-box { border: 2px dashed #fca5a5; background: #fff5f5; border-radius: 8px; padding: 12px; text-align: center; }
         .file-box input[type=file] { width: 100%; cursor: pointer; }
+        
+        /* CSS Live Preview Foto Form */
+        .preview-container { margin-top: 10px; display: none; text-align: center; }
+        .img-form-preview { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #dc2626; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        
+        /* CSS Foto Tabel */
+        .foto-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1.5px solid #e5e7eb; display: block; }
+        .no-foto { font-size: 11px; color: #9ca3af; font-style: italic; }
+
         .btn-submit { width: 100%; background: #dc2626; color: white; border: none; padding: 12px; font-size: 15px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px; }
         .btn-submit:hover { background: #b91c1c; }
         .alert { padding: 12px 15px; border-radius: 8px; font-size: 13.5px; font-weight: 600; margin-bottom: 18px; }
         .alert-success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
         .alert-danger { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
         .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; min-width: 600px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; min-width: 650px; }
         th, td { padding: 10px 12px; font-size: 13.5px; text-align: left; border-bottom: 1px solid #f3f4f6; vertical-align: middle; white-space: nowrap; }
         th { background: #fef2f2; color: #991b1b; font-weight: 700; }
         tr:hover { background: #fff1f2; }
@@ -99,7 +112,7 @@ $data_peserta = mysqli_query($koneksi, "SELECT * FROM peserta ORDER BY id DESC")
                 <p>SMK Telkom Malang</p>
             </div>
         </div>
-        <a href="logout.php" class="btn-logout">Logout (<?= htmlspecialchars($_SESSION['username']); ?>)</a>
+        <a href="logout.php" class="btn-logout">Logout (<?= htmlspecialchars($_SESSION['username'] ?? 'User'); ?>)</a>
     </div>
 
     <?= $pesan; ?>
@@ -127,9 +140,13 @@ $data_peserta = mysqli_query($koneksi, "SELECT * FROM peserta ORDER BY id DESC")
                 <input type="text" name="jurusan" class="form-control" placeholder="Contoh: Rekayasa Perangkat Lunak" required>
             </div>
             <div class="form-group">
-                <label>Upload Berkas Persyaratan</label>
+                <label>Upload Foto Siswa</label>
                 <div class="file-box">
-                    <input type="file" name="berkas" class="form-control">
+                    <input type="file" name="berkas" id="inputBerkas" class="form-control" accept="image/*" onchange="previewImage(event)" required>
+                    <div class="preview-container" id="previewContainer">
+                        <p style="font-size:12px; color:#6b7280; margin-bottom:5px;">Preview Foto:</p>
+                        <img id="imagePreview" class="img-form-preview" src="#" alt="Preview Foto">
+                    </div>
                 </div>
             </div>
             <button type="submit" name="daftar" class="btn-submit">
@@ -149,6 +166,7 @@ $data_peserta = mysqli_query($koneksi, "SELECT * FROM peserta ORDER BY id DESC")
                 <thead>
                     <tr>
                         <th>No</th>
+                        <th>Foto</th>
                         <th>NIS</th>
                         <th>Nama</th>
                         <th>Kelas</th>
@@ -161,12 +179,21 @@ $data_peserta = mysqli_query($koneksi, "SELECT * FROM peserta ORDER BY id DESC")
                     <?php $no = 1; while($r = mysqli_fetch_array($data_peserta)): ?>
                     <tr>
                         <td><?= $no++; ?></td>
+                        <td>
+                            <?php if (!empty($r['berkas']) && file_exists('uploads/' . $r['berkas'])): ?>
+                                <a href="uploads/<?= htmlspecialchars($r['berkas']); ?>" target="_blank" title="Klik untuk lihat foto penuh">
+                                    <img src="uploads/<?= htmlspecialchars($r['berkas']); ?>" alt="Foto <?= htmlspecialchars($r['nama']); ?>" class="foto-thumb">
+                                </a>
+                            <?php else: ?>
+                                <span class="no-foto">Tidak ada foto</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= htmlspecialchars($r['nis']); ?></td>
                         <td><?= htmlspecialchars($r['nama']); ?></td>
                         <td><?= htmlspecialchars($r['kelas']); ?></td>
                         <td><?= htmlspecialchars($r['jurusan']); ?></td>
                         <td>
-                            <?php if($r['berkas']): ?>
+                            <?php if (!empty($r['berkas'])): ?>
                                 <a href="download.php?file=<?= urlencode($r['berkas']); ?>" class="btn-act btn-dl">Download</a>
                             <?php else: ?>
                                 <span style="color:#9ca3af;">-</span>
@@ -184,5 +211,26 @@ $data_peserta = mysqli_query($koneksi, "SELECT * FROM peserta ORDER BY id DESC")
     </div>
 
 </div>
+
+<script>
+// JavaScript untuk Live Preview foto sebelum form di-submit
+function previewImage(event) {
+    const input = event.target;
+    const previewContainer = document.getElementById('previewContainer');
+    const imagePreview = document.getElementById('imagePreview');
+
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imagePreview.src = e.target.result;
+            previewContainer.style.display = 'block';
+        }
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        previewContainer.style.display = 'none';
+    }
+}
+</script>
+
 </body>
 </html>
